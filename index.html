@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1f7a5c" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <title>Le mie spese</title>
+  </head>
+  <body>
+    <header class="top">
+      <h1>Le mie spese</h1>
+      <span id="sync-badge" class="sync-badge" hidden></span>
+      <button id="btn-settings" class="icon-btn" aria-label="Impostazioni">⚙</button>
+    </header>
+
+    <main>
+      <section class="summary">
+        <div class="month-nav">
+          <button id="prev-month" class="icon-btn" aria-label="Mese precedente">‹</button>
+          <div id="month-label" class="month-label"></div>
+          <button id="next-month" class="icon-btn" aria-label="Mese successivo">›</button>
+        </div>
+        <div id="month-total" class="total"></div>
+        <div id="month-sub" class="sub"></div>
+        <div id="categories" class="cats"></div>
+      </section>
+
+      <section id="list" class="list"></section>
+    </main>
+
+    <div class="actions">
+      <button id="btn-scan" class="btn secondary">📷 Scontrino</button>
+      <button id="btn-add" class="btn primary">＋ Aggiungi spesa</button>
+    </div>
+    <input id="photo-input" type="file" accept="image/*" capture="environment" hidden />
+
+    <!-- Spesa -->
+    <dialog id="dlg-expense">
+      <form id="form-expense" method="dialog">
+        <h2 id="expense-title">Nuova spesa</h2>
+        <div id="scan-status" class="status" hidden></div>
+        <label class="field amount">
+          <span>Importo (€)</span>
+          <input id="f-amount" inputmode="decimal" autocomplete="off" placeholder="0,00" required />
+        </label>
+        <label class="field">
+          <span>Descrizione</span>
+          <input id="f-desc" autocomplete="off" placeholder="Es. Supermercato" maxlength="80" />
+        </label>
+        <div class="field">
+          <span>Categoria</span>
+          <div id="f-cats" class="chips"></div>
+        </div>
+        <label class="field">
+          <span>Data</span>
+          <input id="f-date" type="date" required />
+        </label>
+        <div class="field">
+          <span>Scontrino</span>
+          <div class="photo-row">
+            <img id="f-photo" alt="Foto dello scontrino" hidden />
+            <button type="button" id="f-photo-add" class="btn small secondary">📷 Aggiungi foto</button>
+            <button type="button" id="f-photo-del" class="btn small ghost" hidden>Rimuovi</button>
+          </div>
+        </div>
+        <div id="form-error" class="error" hidden></div>
+        <div class="dlg-actions">
+          <button type="button" id="f-delete" class="btn ghost danger" hidden>Elimina</button>
+          <span class="spacer"></span>
+          <button type="button" id="f-cancel" class="btn ghost">Annulla</button>
+          <button type="submit" class="btn primary">Salva</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Impostazioni -->
+    <dialog id="dlg-settings">
+      <form method="dialog">
+        <h2>Impostazioni</h2>
+        <label class="field">
+          <span>Chiave API Anthropic (per leggere gli scontrini)</span>
+          <input id="s-key" type="password" autocomplete="off" placeholder="sk-ant-..." />
+        </label>
+        <p class="hint">
+          La chiave resta salvata solo su questo dispositivo e viene usata per inviare la foto dello
+          scontrino a Claude. Senza chiave puoi comunque allegare la foto e inserire i dati a mano.
+        </p>
+        <h3>Backup su Google Sheet</h3>
+        <label class="field">
+          <span>URL dell'app web (finisce con /exec)</span>
+          <input id="s-sync-url" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/.../exec" />
+        </label>
+        <label class="field">
+          <span>Codice segreto</span>
+          <input id="s-sync-token" type="password" autocomplete="off" />
+        </label>
+        <div class="row">
+          <button type="button" id="s-sync-all" class="btn small secondary">Invia tutto al foglio</button>
+          <button type="button" id="s-sync-restore" class="btn small secondary">Ripristina dal foglio</button>
+        </div>
+        <div id="sync-msg" class="hint"></div>
+        <h3>Backup su file</h3>
+        <div class="row">
+          <button type="button" id="s-export-json" class="btn small secondary">Esporta backup</button>
+          <button type="button" id="s-export-csv" class="btn small secondary">Esporta CSV</button>
+          <button type="button" id="s-import" class="btn small secondary">Importa backup</button>
+          <input id="s-import-file" type="file" accept="application/json,.json" hidden />
+        </div>
+        <div id="settings-msg" class="hint"></div>
+        <div class="dlg-actions">
+          <span class="spacer"></span>
+          <button type="button" id="s-close" class="btn primary">Fatto</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

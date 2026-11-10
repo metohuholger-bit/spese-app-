@@ -1,0 +1,548 @@
+<title>Le mie spese</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+  /* Layout: una colonna da telefono; in alto il mese come estratto conto, sotto il registro per giorno, azioni fisse in basso. */
+  :root {
+    --bg: #f3f5f2;
+    --card: #ffffff;
+    --fg: #17201c;
+    --muted: #5f6b65;
+    --line: #dde3de;
+    --accent: #17694f;
+    --on-accent: #ffffff;
+    --danger: #b3372f;
+    --note-bg: #e6eef5;
+    --ok-bg: #dff1e7;
+    --warn-bg: #fbeed6;
+    --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+    --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121614; --card: #1b211e; --fg: #e9eeea; --muted: #98a59e; --line: #2b3430;
+      --accent: #4dbb93; --on-accent: #08130f; --danger: #f08379;
+      --note-bg: #1c2733; --ok-bg: #17322a; --warn-bg: #382d16;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121614; --card: #1b211e; --fg: #e9eeea; --muted: #98a59e; --line: #2b3430;
+    --accent: #4dbb93; --on-accent: #08130f; --danger: #f08379;
+    --note-bg: #1c2733; --ok-bg: #17322a; --warn-bg: #382d16;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.45 var(--font-body);
+    -webkit-tap-highlight-color: transparent;
+  }
+  button, input { font: inherit; color: inherit; }
+
+  .wrap {
+    max-width: 560px;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 16px 132px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  h1 { font: 700 1.15rem var(--font-display); margin: 0; }
+  h2 { font: 700 1.2rem var(--font-display); margin: 0; }
+
+  .notice { padding: 10px 12px; border-radius: 12px; font-size: .9rem; background: var(--note-bg); }
+  .notice.ok { background: var(--ok-bg); }
+  .notice.warn { background: var(--warn-bg); }
+  .notice.busy { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .55; } }
+  @media (prefers-reduced-motion: reduce) { .notice.busy { animation: none; } }
+
+  /* Riepilogo del mese */
+  .summary {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 10px 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .month-nav { display: flex; align-items: center; justify-content: space-between; }
+  .month-label { font-weight: 600; }
+  .icon-btn {
+    width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent;
+    font-size: 1.5rem; line-height: 1; cursor: pointer;
+  }
+  .icon-btn:disabled { opacity: .3; cursor: default; }
+  .total {
+    font: 700 2.6rem/1.1 var(--font-display);
+    letter-spacing: -.02em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .sub { text-align: center; color: var(--muted); font-size: .9rem; }
+  .cats { display: grid; gap: 10px; margin-top: 14px; }
+  .cats:empty { display: none; }
+  .cat-head { display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; font-variant-numeric: tabular-nums; }
+  .bar { height: 6px; border-radius: 3px; background: var(--line); margin-top: 4px; overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 3px; }
+
+  /* Registro */
+  .list { display: flex; flex-direction: column; gap: 18px; }
+  .day { display: flex; flex-direction: column; gap: 6px; }
+  .day-head {
+    display: flex; justify-content: space-between; color: var(--muted);
+    font-size: .85rem; padding: 0 4px; font-variant-numeric: tabular-nums;
+  }
+  .day-head span:first-child::first-letter { text-transform: uppercase; }
+  .item {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px;
+    padding: 10px 12px; background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; text-align: left; cursor: pointer;
+  }
+  .dot { flex: none; width: 12px; height: 12px; border-radius: 50%; }
+  .item-text { flex: 1; min-width: 0; display: grid; }
+  .item-desc { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item-cat { color: var(--muted); font-size: .82rem; }
+  .item-amount { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .empty { text-align: center; color: var(--muted); margin: 32px 0 0; text-wrap: balance; }
+
+  /* Azioni fisse in basso */
+  .actions {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(to top, var(--bg) 70%, transparent);
+    padding-top: 12px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .actions-in { max-width: 528px; margin: 0 auto; display: flex; gap: 10px; }
+  .actions-in .primary { flex: 1; }
+
+  .btn {
+    min-height: 48px; padding: 0 16px; border-radius: 14px; border: 1px solid transparent;
+    font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.primary { background: var(--accent); color: var(--on-accent); }
+  .btn.secondary { background: var(--card); border-color: var(--line); }
+  .btn.ghost { background: transparent; }
+  .btn.danger { color: var(--danger); }
+
+  /* Scheda spesa */
+  dialog {
+    width: min(560px, 100%); max-width: 100%; max-height: 92dvh;
+    margin: auto auto 0; border: 0; border-radius: 20px 20px 0 0;
+    background: var(--card); color: var(--fg); overflow-y: auto;
+    padding: 20px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+  @media (min-width: 600px) { dialog { margin: auto; border-radius: 20px; } }
+  dialog::backdrop { background: rgb(0 0 0 / .45); }
+  dialog form { display: flex; flex-direction: column; gap: 14px; }
+  .field { display: grid; gap: 6px; }
+  .field > span { font-size: .85rem; color: var(--muted); }
+  .field input {
+    width: 100%; min-height: 48px; padding: 0 12px; border: 1px solid var(--line);
+    border-radius: 12px; background: var(--bg);
+  }
+  .field.amount input { font: 700 1.8rem var(--font-display); min-height: 60px; font-variant-numeric: tabular-nums; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 20px;
+    background: var(--bg); font-size: .9rem; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .chip.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
+  .error { color: var(--danger); font-size: .9rem; }
+  .dlg-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .spacer { flex: 1; }
+
+  :is(.btn, .chip, .item, .icon-btn, input):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <h1>Le mie spese</h1>
+
+  <div id="page-note" class="notice" hidden></div>
+
+  <section class="summary" aria-label="Riepilogo del mese">
+    <div class="month-nav">
+      <button id="prev-month" class="icon-btn" aria-label="Mese precedente">‹</button>
+      <div id="month-label" class="month-label"></div>
+      <button id="next-month" class="icon-btn" aria-label="Mese successivo">›</button>
+    </div>
+    <div id="month-total" class="total">0,00 €</div>
+    <div id="month-sub" class="sub">Carico le tue spese…</div>
+    <div id="categories" class="cats"></div>
+  </section>
+
+  <section id="list" class="list" aria-label="Spese del mese"></section>
+</div>
+
+<div class="actions">
+  <div class="actions-in">
+    <button id="btn-scan" class="btn secondary" disabled>Foto scontrino</button>
+    <button id="btn-add" class="btn primary" disabled>+ Aggiungi spesa</button>
+  </div>
+</div>
+<input id="photo-input" type="file" accept="image/*" capture="environment" hidden>
+
+<dialog id="dlg-expense">
+  <form id="form-expense" novalidate>
+    <h2 id="expense-title">Nuova spesa</h2>
+    <div id="scan-status" class="notice" hidden></div>
+    <label class="field amount">
+      <span>Importo (€)</span>
+      <input id="f-amount" inputmode="decimal" autocomplete="off" placeholder="0,00">
+    </label>
+    <label class="field">
+      <span>Descrizione</span>
+      <input id="f-desc" autocomplete="off" placeholder="Es. Supermercato" maxlength="80">
+    </label>
+    <div class="field">
+      <span>Categoria</span>
+      <div id="f-cats" class="chips"></div>
+    </div>
+    <label class="field">
+      <span>Data</span>
+      <input id="f-date" type="date">
+    </label>
+    <div id="form-error" class="error" hidden></div>
+    <div class="dlg-actions">
+      <button type="button" id="f-delete" class="btn ghost danger" hidden>Elimina</button>
+      <span class="spacer"></span>
+      <button type="button" id="f-cancel" class="btn ghost">Annulla</button>
+      <button type="submit" id="f-save" class="btn primary">Salva</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  const CATEGORIES = [
+    { id: 'alimentari', label: 'Spesa alimentare', color: '#2e8b6a' },
+    { id: 'ristoranti', label: 'Ristoranti e bar', color: '#d9772b' },
+    { id: 'trasporti', label: 'Trasporti', color: '#3b78c4' },
+    { id: 'casa', label: 'Casa e bollette', color: '#8a63c9' },
+    { id: 'salute', label: 'Salute', color: '#cf4f6a' },
+    { id: 'shopping', label: 'Shopping', color: '#c79a1e' },
+    { id: 'svago', label: 'Svago', color: '#2a9aa8' },
+    { id: 'altro', label: 'Altro', color: '#7c8088' },
+  ];
+  const categoryById = (id) => CATEGORIES.find((c) => c.id === id) || CATEGORIES[CATEGORIES.length - 1];
+
+  const euro = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
+  const monthFmt = new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' });
+  const dayFmt = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+  const pad = (n) => String(n).padStart(2, '0');
+  const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const today = () => isoDate(new Date());
+  const parseIso = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
+  const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+  const state = {
+    expenses: [],
+    loaded: false,
+    month: today().slice(0, 7),
+    editing: null,
+    category: 'alimentari',
+    deleteArmed: false,
+  };
+  let col = null;     // la raccolta privata di chi guarda
+  let sample = null;  // Claude, sull'abbonamento di chi guarda
+  let scanToken = 0;
+
+  function pageNote(text, kind) {
+    const el = $('page-note');
+    el.hidden = !text;
+    el.textContent = text || '';
+    el.className = 'notice' + (kind ? ' ' + kind : '');
+  }
+
+  // ---------- Riepilogo e registro ----------
+
+  function daysElapsed(y, m) {
+    const now = new Date();
+    const current = now.getFullYear() === y && now.getMonth() + 1 === m;
+    return current ? now.getDate() : new Date(y, m, 0).getDate();
+  }
+
+  function render() {
+    const [y, m] = state.month.split('-').map(Number);
+    const label = monthFmt.format(new Date(y, m - 1, 1));
+    $('month-label').textContent = label.charAt(0).toUpperCase() + label.slice(1);
+    $('next-month').disabled = state.month >= today().slice(0, 7);
+
+    const items = state.expenses
+      .filter((e) => e.date.startsWith(state.month))
+      .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+    const total = items.reduce((s, e) => s + e.cents, 0);
+
+    $('month-total').textContent = euro.format(total / 100);
+    if (state.loaded) {
+      $('month-sub').textContent = items.length
+        ? `${items.length} ${items.length === 1 ? 'spesa' : 'spese'} · media ${euro.format(total / 100 / daysElapsed(y, m))} al giorno`
+        : 'Nessuna spesa in questo mese';
+    }
+
+    const byCat = new Map();
+    for (const e of items) byCat.set(e.category, (byCat.get(e.category) || 0) + e.cents);
+    $('categories').innerHTML = [...byCat.entries()].sort((a, b) => b[1] - a[1]).map(([id, cents]) => {
+      const cat = categoryById(id);
+      const pct = total ? Math.round((cents / total) * 100) : 0;
+      return `<div><div class="cat-head"><span>${escapeHtml(cat.label)}</span><span>${euro.format(cents / 100)} · ${pct}%</span></div>
+        <div class="bar"><div style="width:${Math.max(pct, 2)}%;background:${cat.color}"></div></div></div>`;
+    }).join('');
+
+    if (!items.length) {
+      $('list').innerHTML = state.loaded
+        ? '<p class="empty">Qui comparirà il registro del mese. Aggiungi la prima spesa a mano oppure fotografa uno scontrino.</p>'
+        : '';
+      return;
+    }
+    const groups = new Map();
+    for (const e of items) { if (!groups.has(e.date)) groups.set(e.date, []); groups.get(e.date).push(e); }
+    $('list').innerHTML = [...groups.entries()].map(([date, list]) => {
+      const dayTotal = list.reduce((s, e) => s + e.cents, 0);
+      const dayLabel = date === today() ? 'Oggi' : dayFmt.format(parseIso(date));
+      return `<div class="day"><div class="day-head"><span>${escapeHtml(dayLabel)}</span><span>${euro.format(dayTotal / 100)}</span></div>${
+        list.map((e) => {
+          const cat = categoryById(e.category);
+          return `<button class="item" data-id="${escapeHtml(e.id)}">
+            <span class="dot" style="background:${cat.color}"></span>
+            <span class="item-text"><span class="item-desc">${escapeHtml(e.description || cat.label)}</span><span class="item-cat">${escapeHtml(cat.label)}</span></span>
+            <span class="item-amount">${euro.format(e.cents / 100)}</span></button>`;
+        }).join('')}</div>`;
+    }).join('');
+  }
+
+  function shiftMonth(delta) {
+    const [y, m] = state.month.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    state.month = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+    render();
+  }
+
+  // ---------- Scheda spesa ----------
+
+  function renderChips() {
+    $('f-cats').innerHTML = CATEGORIES.map((c) =>
+      `<button type="button" class="chip${c.id === state.category ? ' on' : ''}" data-cat="${c.id}" aria-pressed="${c.id === state.category}"><span class="dot" style="background:${c.color}"></span>${escapeHtml(c.label)}</button>`
+    ).join('');
+  }
+
+  function setStatus(text, kind) {
+    const el = $('scan-status');
+    el.hidden = !text;
+    el.textContent = text || '';
+    el.className = 'notice' + (kind ? ' ' + kind : '');
+  }
+
+  function formError(text) {
+    $('form-error').textContent = text || '';
+    $('form-error').hidden = !text;
+  }
+
+  function disarmDelete() {
+    state.deleteArmed = false;
+    $('f-delete').textContent = 'Elimina';
+  }
+
+  function openExpense(expense) {
+    state.editing = expense || null;
+    state.category = expense ? categoryById(expense.category).id : 'alimentari';
+    $('expense-title').textContent = expense ? 'Modifica spesa' : 'Nuova spesa';
+    $('f-amount').value = expense ? (expense.cents / 100).toFixed(2).replace('.', ',') : '';
+    $('f-desc').value = expense ? expense.description : '';
+    $('f-date').value = expense ? expense.date : today();
+    $('f-date').max = today();
+    $('f-delete').hidden = !expense;
+    $('f-save').disabled = false;
+    disarmDelete();
+    formError('');
+    setStatus('');
+    renderChips();
+    if (!$('dlg-expense').open) $('dlg-expense').showModal();
+  }
+
+  // Accetta "12,50", "12.50", "1.234,56", "€ 12": restituisce i centesimi oppure null.
+  function parseAmount(text) {
+    let s = text.replace(/[€\s]/g, '');
+    if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    if (!/^\d+(\.\d{1,2})?$/.test(s)) return null;
+    const cents = Math.round(Number(s) * 100);
+    return cents > 0 ? cents : null;
+  }
+
+  async function submitExpense(event) {
+    event.preventDefault();
+    if (!col) return;
+    const cents = parseAmount($('f-amount').value);
+    const date = $('f-date').value;
+    if (cents === null) return formError('Inserisci un importo valido, ad esempio 12,50.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return formError('Scegli una data.');
+    const body = {
+      cents,
+      description: $('f-desc').value.trim(),
+      category: state.category,
+      date,
+      createdAt: state.editing ? state.editing.createdAt : Date.now(),
+    };
+    $('f-save').disabled = true;
+    try {
+      const ref = state.editing ? col.doc(state.editing.id) : col.doc();
+      await ref.set(body);
+      state.month = date.slice(0, 7);
+      $('dlg-expense').close();
+      render();
+    } catch (e) {
+      formError(e && e.code === 'quota_exceeded'
+        ? 'Archivio pieno: elimina qualche spesa vecchia e riprova.'
+        : 'Salvataggio non riuscito. Controlla la connessione e riprova.');
+    } finally {
+      $('f-save').disabled = false;
+    }
+  }
+
+  async function removeExpense() {
+    if (!state.editing || !col) return;
+    if (!state.deleteArmed) {
+      state.deleteArmed = true;
+      $('f-delete').textContent = 'Conferma eliminazione';
+      return;
+    }
+    $('f-delete').disabled = true;
+    try {
+      await col.doc(state.editing.id).delete();
+      $('dlg-expense').close();
+    } catch {
+      formError('Eliminazione non riuscita. Riprova.');
+    } finally {
+      $('f-delete').disabled = false;
+      disarmDelete();
+    }
+  }
+
+  // ---------- Scontrino ----------
+
+  const PROMPT = `La foto allegata è uno scontrino o una ricevuta, di solito italiana.
+Rispondi SOLO con un oggetto JSON in questa forma:
+{"leggibile": true, "negozio": "Esselunga", "totale": 23.5, "data": "2026-11-10", "categoria": "alimentari"}
+
+- "totale": il totale effettivamente pagato in euro come numero (la riga TOTALE / TOTALE COMPLESSIVO, non subtotali, resto o contanti consegnati).
+- "data": la data di emissione in formato AAAA-MM-GG (sugli scontrini italiani è scritta GG/MM/AAAA).
+- "negozio": il nome dell'esercente, breve.
+- "categoria": una sola tra ${CATEGORIES.map((c) => `${c.id} (${c.label})`).join(', ')}.
+- Se un dato non si legge con sicurezza usa null invece di tirare a indovinare.
+- Se la foto non è uno scontrino o non si legge, rispondi {"leggibile": false}.`;
+
+  const SCAN_ERRORS = {
+    not_granted: 'Lettura automatica non autorizzata: inserisci i dati a mano.',
+    sampling_disabled: 'Claude non è disponibile su questo account: inserisci i dati a mano.',
+    images_unavailable: 'Da qui non è possibile inviare foto a Claude: inserisci i dati a mano.',
+    image_rejected: 'Questa foto non va bene (formato o dimensione). Provane un\'altra.',
+    rate_limited: 'Hai raggiunto il limite di utilizzo di Claude per ora. Inserisci i dati a mano o riprova più tardi.',
+    session_expired: 'Sessione scaduta: accedi di nuovo a Claude e riprova.',
+    refused: 'Claude non ha potuto leggere questa foto. Inserisci i dati a mano.',
+  };
+
+  async function onPhotoPicked() {
+    const file = $('photo-input').files && $('photo-input').files[0];
+    if (!file || !sample) return;
+    openExpense(null);
+    const token = ++scanToken;
+    setStatus('Sto leggendo lo scontrino…', 'busy');
+    try {
+      const r = await sample.json(PROMPT, { images: file, modelTier: 'quick' });
+      if (token !== scanToken || !$('dlg-expense').open) return;
+      if (!r || r.leggibile === false) return setStatus('Non riesco a leggere lo scontrino. Inserisci i dati a mano.', 'warn');
+      const totale = typeof r.totale === 'number' && r.totale > 0 ? r.totale : null;
+      if (totale !== null) $('f-amount').value = totale.toFixed(2).replace('.', ',');
+      if (typeof r.negozio === 'string' && r.negozio) $('f-desc').value = r.negozio.slice(0, 80);
+      if (typeof r.data === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.data) && r.data <= today()) $('f-date').value = r.data;
+      state.category = categoryById(r.categoria).id;
+      renderChips();
+      setStatus(totale !== null ? 'Scontrino letto: controlla i dati e salva.' : 'Totale non leggibile: inseriscilo a mano.', totale !== null ? 'ok' : 'warn');
+    } catch (e) {
+      if (token !== scanToken) return;
+      setStatus(SCAN_ERRORS[e && e.code] || 'Lettura non riuscita. Inserisci i dati a mano o riprova.', 'warn');
+    }
+  }
+
+  // ---------- Eventi ----------
+
+  $('prev-month').addEventListener('click', () => shiftMonth(-1));
+  $('next-month').addEventListener('click', () => shiftMonth(1));
+  $('btn-add').addEventListener('click', () => openExpense(null));
+  $('btn-scan').addEventListener('click', () => { $('photo-input').value = ''; $('photo-input').click(); });
+  $('photo-input').addEventListener('change', onPhotoPicked);
+  $('list').addEventListener('click', (event) => {
+    const item = event.target.closest('.item');
+    const expense = item && state.expenses.find((e) => e.id === item.dataset.id);
+    if (expense) openExpense(expense);
+  });
+  $('f-cats').addEventListener('click', (event) => {
+    const chip = event.target.closest('.chip');
+    if (!chip) return;
+    state.category = chip.dataset.cat;
+    renderChips();
+  });
+  $('form-expense').addEventListener('submit', submitExpense);
+  $('f-cancel').addEventListener('click', () => $('dlg-expense').close());
+  $('f-delete').addEventListener('click', removeExpense);
+  $('dlg-expense').addEventListener('close', () => { scanToken++; });
+
+  // ---------- Avvio ----------
+
+  function toExpense(doc) {
+    const d = doc.data() || {};
+    if (!Number.isInteger(d.cents) || typeof d.date !== 'string') return null;
+    return { id: doc.id, cents: d.cents, date: d.date, description: String(d.description || ''), category: String(d.category || 'altro'), createdAt: Number(d.createdAt) || 0 };
+  }
+
+  async function start() {
+    render();
+    const claude = window.claude;
+    if (!claude || !claude.use) {
+      $('month-sub').textContent = 'Archivio non disponibile';
+      return pageNote('Apri questa pagina da claude.ai con il tuo account per vedere e salvare le spese.', 'warn');
+    }
+    const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
+    const uid = user ? await user.id() : null;
+    if (!db || !uid) {
+      $('month-sub').textContent = 'Archivio non disponibile';
+      return pageNote('Accedi a claude.ai con il tuo account per vedere e salvare le spese.', 'warn');
+    }
+    col = db.collection('data/users/' + uid + '/registro/spese');
+    $('btn-add').disabled = false;
+
+    const slow = setTimeout(() => pageNote('Non riesco ancora a raggiungere l\'archivio. I dati potrebbero non essere aggiornati.', 'warn'), 10000);
+    col.onSnapshot((snap) => {
+      state.expenses = snap.docs.map(toExpense).filter(Boolean);
+      state.loaded = true;
+      if (!snap.metadata.fromCache) { clearTimeout(slow); pageNote(''); }
+      render();
+    }, () => {
+      clearTimeout(slow);
+      state.loaded = true;
+      render();
+      pageNote('L\'archivio non è raggiungibile in questo momento. Riapri la pagina più tardi.', 'warn');
+    });
+
+    sample = await claude.use('sample');
+    const limits = sample ? await sample.limits().catch(() => null) : null;
+    if (sample && limits && limits.images) $('btn-scan').disabled = false;
+    else { sample = null; $('btn-scan').hidden = true; }
+  }
+
+  start();
+})();
+</script>
